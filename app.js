@@ -321,6 +321,10 @@
         const chat = chats.find(c => c.id === activeChatId);
         if (!chat) return;
 
+        // Disable input elements during transmission to prevent spamming
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+
         // Add user message
         const userMsg = {
             sender: 'user',
@@ -342,7 +346,6 @@
         // Clear input and reset heights
         messageInput.value = '';
         messageInput.style.height = 'auto';
-        sendBtn.disabled = true;
 
         // Show typing indicator
         showTypingIndicator();
@@ -386,6 +389,11 @@
             chat.messages.push(errorMsg);
             saveChats();
             renderMessages();
+        } finally {
+            // Re-enable and refocus inputs
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            messageInput.focus();
         }
     }
 
@@ -892,16 +900,20 @@ myCounter.decrement(); // 11
             // Auto resize height
             messageInput.style.height = 'auto';
             messageInput.style.height = messageInput.scrollHeight + 'px';
-            
-            // Toggle send button
-            sendBtn.disabled = !messageInput.value.trim();
         });
 
         // Textarea Enter behavior
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
+                // Prevent duplicate submit on Korean IME commit
+                if (e.isComposing || e.keyCode === 229) {
+                    return;
+                }
                 e.preventDefault();
-                chatForm.dispatchEvent(new Event('submit'));
+                const text = messageInput.value;
+                if (text.trim()) {
+                    handleSendMessage(text);
+                }
             }
         });
 
@@ -919,7 +931,9 @@ myCounter.decrement(); // 11
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = messageInput.value;
-            handleSendMessage(text);
+            if (text.trim()) {
+                handleSendMessage(text);
+            }
         });
 
         // --- Settings Modal Events ---
