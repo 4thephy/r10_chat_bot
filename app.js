@@ -15,6 +15,9 @@
         persona: 'companion'
     };
 
+    // Auth & Users State
+    let currentUser = null;
+
     // --- DOM Elements ---
     const sidebar = document.getElementById('sidebar');
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -50,50 +53,154 @@
     const importFileInput = document.getElementById('importFileInput');
     const clearAllDataBtn = document.getElementById('clearAllDataBtn');
 
+    // Auth DOM Elements
+    const authOverlay = document.getElementById('authOverlay');
+    const loginTabBtn = document.getElementById('loginTabBtn');
+    const signupTabBtn = document.getElementById('signupTabBtn');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    
+    const loginUsernameInput = document.getElementById('loginUsername');
+    const loginPasswordInput = document.getElementById('loginPassword');
+    const toggleLoginPwBtn = document.getElementById('toggleLoginPwBtn');
+    const loginError = document.getElementById('loginError');
+
+    const signupUsernameInput = document.getElementById('signupUsername');
+    const signupNicknameInput = document.getElementById('signupNickname');
+    const signupPasswordInput = document.getElementById('signupPassword');
+    const signupPasswordConfirmInput = document.getElementById('signupPasswordConfirm');
+    const toggleSignupPwBtn = document.getElementById('toggleSignupPwBtn');
+    const signupError = document.getElementById('signupError');
+
+    const toSignupLink = document.getElementById('toSignupLink');
+    const toLoginLink = document.getElementById('toLoginLink');
+
+    // Sidebar User Profile DOM Elements
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    const userStatus = document.getElementById('userStatus');
+    const logoutBtn = document.getElementById('logoutBtn');
+
     // --- Life Cycle & Initialization ---
     function init() {
-        loadSettings();
-        loadChats();
         setupEventListeners();
-        applyTheme();
-        updateApiKeyStatusUI();
+        
+        const isLoggedIn = loadCurrentUser();
+        if (isLoggedIn) {
+            authOverlay.classList.add('hidden');
+            updateUserProfileUI();
+            loadSettings();
+            loadChats();
+            applyTheme();
+            updateApiKeyStatusUI();
 
-        // Load active or most recent chat
-        if (chats.length > 0) {
-            // Find most recently updated chat or default to the first one
-            const sorted = [...chats].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            selectChat(sorted[0].id);
+            // Load active or most recent chat
+            if (chats.length > 0) {
+                // Find most recently updated chat or default to the first one
+                const sorted = [...chats].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                selectChat(sorted[0].id);
+            } else {
+                showWelcomeScreen();
+            }
         } else {
-            showWelcomeScreen();
+            authOverlay.classList.remove('hidden');
         }
+    }
+
+    // --- Auth & User Management Helpers ---
+    function loadCurrentUser() {
+        const stored = localStorage.getItem('lumina_current_user');
+        if (stored) {
+            try {
+                currentUser = JSON.parse(stored);
+                return true;
+            } catch (e) {
+                console.error('사용자 세션 로드 실패:', e);
+                currentUser = null;
+            }
+        }
+        return false;
+    }
+
+    function saveCurrentUser(user) {
+        currentUser = user;
+        localStorage.setItem('lumina_current_user', JSON.stringify(user));
+        updateUserProfileUI();
+    }
+
+    function updateUserProfileUI() {
+        if (currentUser) {
+            userName.textContent = currentUser.nickname || currentUser.username;
+            userStatus.textContent = '일반 사용자';
+            
+            // Avatar mapping
+            const avatarChar = (currentUser.nickname || currentUser.username).charAt(0).toUpperCase();
+            userAvatar.textContent = avatarChar;
+            
+            // Set dynamic theme class
+            userAvatar.className = `avatar-user avatar-theme-${currentUser.avatarTheme || 'purple'}`;
+        } else {
+            userName.textContent = '게스트 사용자';
+            userStatus.textContent = '로그인 없음 (로컬)';
+            userAvatar.textContent = 'G';
+            userAvatar.className = 'avatar-user';
+        }
+    }
+
+    function loadUsers() {
+        const stored = localStorage.getItem('lumina_users');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch (e) {
+                console.error('회원 목록 로드 실패:', e);
+                return [];
+            }
+        }
+        return [];
+    }
+
+    function saveUsers(users) {
+        localStorage.setItem('lumina_users', JSON.stringify(users));
     }
 
     // --- Storage Helpers ---
     function loadSettings() {
-        const stored = localStorage.getItem('lumina_settings');
+        if (!currentUser) return;
+        const stored = localStorage.getItem(`lumina_settings_${currentUser.username}`);
         if (stored) {
             try {
                 settings = { ...settings, ...JSON.parse(stored) };
             } catch (e) {
                 console.error('설정 로드 실패:', e);
             }
+        } else {
+            // Default settings for new user
+            settings = {
+                apiKey: DEFAULT_API_KEY,
+                theme: 'dark',
+                persona: 'companion'
+            };
+            saveSettings();
         }
         
         // If loaded key is empty, populate with default key
         if (!settings.apiKey) {
             settings.apiKey = DEFAULT_API_KEY;
-            localStorage.setItem('lumina_settings', JSON.stringify(settings));
+            localStorage.setItem(`lumina_settings_${currentUser.username}`, JSON.stringify(settings));
         }
     }
 
     function saveSettings() {
-        localStorage.setItem('lumina_settings', JSON.stringify(settings));
+        if (!currentUser) return;
+        localStorage.setItem(`lumina_settings_${currentUser.username}`, JSON.stringify(settings));
         applyTheme();
         updateApiKeyStatusUI();
     }
 
     function loadChats() {
-        const stored = localStorage.getItem('lumina_chats');
+        if (!currentUser) return;
+        const stored = localStorage.getItem(`lumina_chats_${currentUser.username}`);
         if (stored) {
             try {
                 chats = JSON.parse(stored);
@@ -101,11 +208,14 @@
                 console.error('채팅 로드 실패:', e);
                 chats = [];
             }
+        } else {
+            chats = [];
         }
     }
 
     function saveChats() {
-        localStorage.setItem('lumina_chats', JSON.stringify(chats));
+        if (!currentUser) return;
+        localStorage.setItem(`lumina_chats_${currentUser.username}`, JSON.stringify(chats));
         renderChatList();
     }
 
@@ -828,6 +938,162 @@ myCounter.decrement(); // 11
 
     // --- Event Listeners ---
     function setupEventListeners() {
+        // Auth Tab Switching
+        loginTabBtn.addEventListener('click', () => {
+            loginTabBtn.classList.add('active');
+            signupTabBtn.classList.remove('active');
+            loginForm.classList.add('active');
+            signupForm.classList.remove('active');
+            loginError.textContent = '';
+            signupError.textContent = '';
+        });
+
+        signupTabBtn.addEventListener('click', () => {
+            signupTabBtn.classList.add('active');
+            loginTabBtn.classList.remove('active');
+            signupForm.classList.add('active');
+            loginForm.classList.remove('active');
+            loginError.textContent = '';
+            signupError.textContent = '';
+        });
+
+        toSignupLink.addEventListener('click', () => {
+            signupTabBtn.click();
+        });
+
+        toLoginLink.addEventListener('click', () => {
+            loginTabBtn.click();
+        });
+
+        // Toggle Password Visibility
+        toggleLoginPwBtn.addEventListener('click', () => {
+            const isPassword = loginPasswordInput.type === 'password';
+            loginPasswordInput.type = isPassword ? 'text' : 'password';
+            toggleLoginPwBtn.querySelector('svg').style.color = isPassword ? '#00ffff' : '';
+        });
+
+        toggleSignupPwBtn.addEventListener('click', () => {
+            const isPassword = signupPasswordInput.type === 'password';
+            signupPasswordInput.type = isPassword ? 'text' : 'password';
+            toggleSignupPwBtn.querySelector('svg').style.color = isPassword ? '#00ffff' : '';
+        });
+
+        // Login Handler
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = loginUsernameInput.value.trim().toLowerCase();
+            const password = loginPasswordInput.value;
+
+            if (!username || !password) {
+                loginError.textContent = '아이디와 비밀번호를 모두 입력해 주세요.';
+                return;
+            }
+
+            const users = loadUsers();
+            const user = users.find(u => u.username === username);
+
+            if (!user || user.password !== password) {
+                loginError.textContent = '아이디 또는 비밀번호가 일치하지 않습니다.';
+                return;
+            }
+
+            saveCurrentUser(user);
+            authOverlay.classList.add('hidden');
+            
+            loadSettings();
+            loadChats();
+            applyTheme();
+            updateApiKeyStatusUI();
+
+            if (chats.length > 0) {
+                const sorted = [...chats].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                selectChat(sorted[0].id);
+            } else {
+                showWelcomeScreen();
+                renderChatList();
+            }
+
+            showToast(`${user.nickname}님, 환영합니다!`);
+            loginUsernameInput.value = '';
+            loginPasswordInput.value = '';
+            loginError.textContent = '';
+        });
+
+        // Signup Handler
+        signupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = signupUsernameInput.value.trim().toLowerCase();
+            const nickname = signupNicknameInput.value.trim();
+            const password = signupPasswordInput.value;
+            const passwordConfirm = signupPasswordConfirmInput.value;
+            const selectedAvatarTheme = signupForm.querySelector('input[name="avatarTheme"]:checked').value;
+
+            if (username.length < 4 || !/^[a-z0-9]+$/.test(username)) {
+                signupError.textContent = '아이디는 영문 소문자와 숫자 조합 4자 이상이어야 합니다.';
+                return;
+            }
+            if (!nickname) {
+                signupError.textContent = '닉네임을 입력해 주세요.';
+                return;
+            }
+            if (password.length < 6) {
+                signupError.textContent = '비밀번호는 6자 이상이어야 합니다.';
+                return;
+            }
+            if (password !== passwordConfirm) {
+                signupError.textContent = '비밀번호가 일치하지 않습니다.';
+                return;
+            }
+
+            const users = loadUsers();
+            if (users.some(u => u.username === username)) {
+                signupError.textContent = '이미 사용 중인 아이디입니다.';
+                return;
+            }
+
+            const newUser = {
+                username,
+                nickname,
+                password,
+                avatarTheme: selectedAvatarTheme,
+                createdAt: new Date().toISOString()
+            };
+
+            users.push(newUser);
+            saveUsers(users);
+
+            saveCurrentUser(newUser);
+            authOverlay.classList.add('hidden');
+
+            loadSettings();
+            loadChats();
+            applyTheme();
+            updateApiKeyStatusUI();
+
+            showWelcomeScreen();
+            renderChatList();
+
+            showToast('회원가입 및 로그인이 완료되었습니다!');
+
+            signupUsernameInput.value = '';
+            signupNicknameInput.value = '';
+            signupPasswordInput.value = '';
+            signupPasswordConfirmInput.value = '';
+            signupError.textContent = '';
+        });
+
+        // Logout Handler
+        logoutBtn.addEventListener('click', () => {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                localStorage.removeItem('lumina_current_user');
+                currentUser = null;
+                showToast('로그아웃 되었습니다.');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            }
+        });
+
         // Mobile Sidebar Toggle
         mobileMenuBtn.addEventListener('click', () => {
             sidebar.classList.add('open');
@@ -1061,9 +1327,11 @@ myCounter.decrement(); // 11
 
         // Delete All data
         clearAllDataBtn.addEventListener('click', () => {
-            if (confirm('⚠️ 경고! 지금까지의 모든 대화 목록과 설정이 완전히 지워지며 복구할 수 없습니다. 계속하시겠습니까?')) {
-                localStorage.removeItem('lumina_chats');
-                localStorage.removeItem('lumina_settings');
+            if (confirm('⚠️ 경고! 현재 로그인된 사용자의 모든 대화 목록과 설정이 완전히 지워지며 복구할 수 없습니다. 계속하시겠습니까?')) {
+                if (currentUser) {
+                    localStorage.removeItem(`lumina_chats_${currentUser.username}`);
+                    localStorage.removeItem(`lumina_settings_${currentUser.username}`);
+                }
                 chats = [];
                 settings = {
                     apiKey: DEFAULT_API_KEY,
