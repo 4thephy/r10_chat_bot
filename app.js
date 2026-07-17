@@ -938,6 +938,29 @@ myCounter.decrement(); // 11
 
     // --- Event Listeners ---
     function setupEventListeners() {
+        // Helper to enable/disable fields depending on active form
+        function toggleFormFields(activeForm) {
+            if (activeForm === 'login') {
+                loginUsernameInput.disabled = false;
+                loginPasswordInput.disabled = false;
+                
+                signupUsernameInput.disabled = true;
+                signupNicknameInput.disabled = true;
+                signupPasswordInput.disabled = true;
+                signupPasswordConfirmInput.disabled = true;
+                signupForm.querySelectorAll('input[name="avatarTheme"]').forEach(input => input.disabled = true);
+            } else {
+                loginUsernameInput.disabled = true;
+                loginPasswordInput.disabled = true;
+                
+                signupUsernameInput.disabled = false;
+                signupNicknameInput.disabled = false;
+                signupPasswordInput.disabled = false;
+                signupPasswordConfirmInput.disabled = false;
+                signupForm.querySelectorAll('input[name="avatarTheme"]').forEach(input => input.disabled = false);
+            }
+        }
+
         // Auth Tab Switching
         loginTabBtn.addEventListener('click', () => {
             loginTabBtn.classList.add('active');
@@ -946,6 +969,7 @@ myCounter.decrement(); // 11
             signupForm.classList.remove('active');
             loginError.textContent = '';
             signupError.textContent = '';
+            toggleFormFields('login');
         });
 
         signupTabBtn.addEventListener('click', () => {
@@ -955,6 +979,7 @@ myCounter.decrement(); // 11
             loginForm.classList.remove('active');
             loginError.textContent = '';
             signupError.textContent = '';
+            toggleFormFields('signup');
         });
 
         toSignupLink.addEventListener('click', () => {
@@ -964,6 +989,9 @@ myCounter.decrement(); // 11
         toLoginLink.addEventListener('click', () => {
             loginTabBtn.click();
         });
+
+        // Initialize default form fields status
+        toggleFormFields('login');
 
         // Toggle Password Visibility
         toggleLoginPwBtn.addEventListener('click', () => {
@@ -1026,7 +1054,7 @@ myCounter.decrement(); // 11
             const nickname = signupNicknameInput.value.trim();
             const password = signupPasswordInput.value;
             const passwordConfirm = signupPasswordConfirmInput.value;
-            const selectedAvatarTheme = signupForm.querySelector('input[name="avatarTheme"]:checked').value;
+            const selectedAvatarTheme = (signupForm.querySelector('input[name="avatarTheme"]:checked')?.value) || 'purple';
 
             if (username.length < 4 || !/^[a-z0-9]+$/.test(username)) {
                 signupError.textContent = '아이디는 영문 소문자와 숫자 조합 4자 이상이어야 합니다.';
