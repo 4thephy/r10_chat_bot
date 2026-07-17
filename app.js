@@ -8,8 +8,9 @@
     // --- State Management ---
     let chats = [];
     let activeChatId = null;
+    const DEFAULT_API_KEY = 'AQ.Ab8RN6IicdVMxWUZrCGGwUg_mTM2FjmSc6EeZSmuNB6AVw3y0g';
     let settings = {
-        apiKey: '',
+        apiKey: DEFAULT_API_KEY,
         theme: 'dark',
         persona: 'companion'
     };
@@ -76,6 +77,12 @@
             } catch (e) {
                 console.error('설정 로드 실패:', e);
             }
+        }
+        
+        // If loaded key is empty, populate with default key
+        if (!settings.apiKey) {
+            settings.apiKey = DEFAULT_API_KEY;
+            localStorage.setItem('lumina_settings', JSON.stringify(settings));
         }
     }
 
@@ -1045,7 +1052,7 @@ myCounter.decrement(); // 11
                 localStorage.removeItem('lumina_settings');
                 chats = [];
                 settings = {
-                    apiKey: '',
+                    apiKey: DEFAULT_API_KEY,
                     theme: 'dark',
                     persona: 'companion'
                 };
